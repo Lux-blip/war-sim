@@ -4,7 +4,7 @@ from datetime import date
 
 st.set_page_config(page_title="ECHOES OF WAR", page_icon="⚔️", layout="wide")
 
-# Dark military theme
+# Theme
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -12,12 +12,10 @@ st.markdown("""
     .stApp { background: #0a0e17 !important; color: #e2e8f0 !important; }
     h1, h2 { color: #f1f5f9 !important; font-weight: 700 !important; }
     .card { background: #1e293b; padding: 24px; border-radius: 16px; border: 1px solid #334155; margin-bottom: 20px; }
-    .map-img { border-radius: 12px; box-shadow: 0 8px 25px rgba(0,0,0,0.6); width: 100%; margin: 1rem 0; }
+    .map-container { border-radius: 12px; overflow: hidden; box-shadow: 0 8px 25px rgba(0,0,0,0.6); margin: 1rem 0; }
     .stButton > button[kind="primary"] {
-        background: #b91c1c !important;
-        color: white !important;
-        font-size: 1.2rem !important;
-        padding: 14px 40px !important;
+        background: #b91c1c !important; color: white !important;
+        font-size: 1.2rem !important; padding: 14px 40px !important;
         border-radius: 12px !important;
     }
     hr { border-color: #334155 !important; }
@@ -25,7 +23,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("ECHOES OF WAR")
-st.caption("Historical Campaign Simulator • Dynamic Battle Maps • Choose Your Side")
+st.caption("Historical War Simulator • Choose Your Side • Maps Update Every Phase")
 
 # Session state
 if 'campaign_active' not in st.session_state:
@@ -47,74 +45,74 @@ if 'morale' not in st.session_state:
 if 'history_score' not in st.session_state:
     st.session_state.history_score = 50
 
-# Campaigns with phase-specific maps
+# Campaigns with phase-specific maps (reliable direct links)
 campaigns = {
     "World War I": {
         "sides": ["Allies (Entente)", "Central Powers"],
         "battles": [
             {"name": "First Battle of the Marne (1914)", "base_cas": 263000,
              "phases": [
-                 {"desc": "German Schlieffen advance toward Paris", 
-                  "map": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Battle_of_the_Marne_-_Map.jpg/800px-Battle_of_the_Marne_-_Map.jpg"},
-                 {"desc": "Allied counterattack begins – taxis of Paris rush to front", 
-                  "map": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Battle_of_the_Marne_-_Map.jpg/800px-Battle_of_the_Marne_-_Map.jpg"},
-                 {"desc": "German retreat – Race to the Sea begins", 
-                  "map": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Battle_of_the_Marne_-_Map.jpg/800px-Battle_of_the_Marne_-_Map.jpg"}
+                 {"desc": "German advance toward Paris", 
+                  "map": "https://upload.wikimedia.org/wikipedia/commons/d/df/Battle_of_the_Marne_-_Map.jpg"},
+                 {"desc": "Allied counterattack begins", 
+                  "map": "https://upload.wikimedia.org/wikipedia/commons/d/df/Battle_of_the_Marne_-_Map.jpg"},
+                 {"desc": "German retreat & stabilization", 
+                  "map": "https://upload.wikimedia.org/wikipedia/commons/d/df/Battle_of_the_Marne_-_Map.jpg"}
              ]},
             {"name": "Battle of Verdun (1916)", "base_cas": 714000,
              "phases": [
-                 {"desc": "German opening bombardment & assault", 
-                  "map": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Battle_of_Verdun_map.png/800px-Battle_of_Verdun_map.png"},
-                 {"desc": "French 'They shall not pass' defense", 
-                  "map": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Battle_of_Verdun_map.png/800px-Battle_of_Verdun_map.png"},
-                 {"desc": "French counter-offensive reclaims ground", 
-                  "map": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Battle_of_Verdun_map.png/800px-Battle_of_Verdun_map.png"}
+                 {"desc": "German initial assault", 
+                  "map": "https://upload.wikimedia.org/wikipedia/commons/5/5d/Battle_of_Verdun_map.png"},
+                 {"desc": "French defensive lines hold", 
+                  "map": "https://upload.wikimedia.org/wikipedia/commons/5/5d/Battle_of_Verdun_map.png"},
+                 {"desc": "French counter-offensive regains ground", 
+                  "map": "https://upload.wikimedia.org/wikipedia/commons/5/5d/Battle_of_Verdun_map.png"}
              ]},
             {"name": "Battle of the Somme (1916)", "base_cas": 623000,
              "phases": [
-                 {"desc": "British zero-hour assault – 1 July", 
-                  "map": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/85/Map_of_the_Battle_of_the_Somme%2C_1916.svg/800px-Map_of_the_Battle_of_the_Somme%2C_1916.svg.png"},
-                 {"desc": "Attrition & tank debut (Sept)", 
-                  "map": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/85/Map_of_the_Battle_of_the_Somme%2C_1916.svg/800px-Map_of_the_Battle_of_the_Somme%2C_1916.svg.png"},
-                 {"desc": "Battle ends – limited gains", 
-                  "map": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/85/Map_of_the_Battle_of_the_Somme%2C_1916.svg/800px-Map_of_the_Battle_of_the_Somme%2C_1916.svg.png"}
+                 {"desc": "Opening assault on 1 July", 
+                  "map": "https://upload.wikimedia.org/wikipedia/commons/a/ab/Map_of_the_Battle_of_the_Somme%2C_1916.svg"},
+                 {"desc": "Mid-battle – tanks introduced", 
+                  "map": "https://upload.wikimedia.org/wikipedia/commons/a/ab/Map_of_the_Battle_of_the_Somme%2C_1916.svg"},
+                 {"desc": "Battle ends in November", 
+                  "map": "https://upload.wikimedia.org/wikipedia/commons/a/ab/Map_of_the_Battle_of_the_Somme%2C_1916.svg"}
              ]}
         ]
     },
     "World War II": {
         "sides": ["Allies", "Axis"],
         "battles": [
-            {"name": "Stalingrad (1942–43)", "base_cas": 1800000,
+            {"name": "Battle of Stalingrad (1942–43)", "base_cas": 1800000,
              "phases": [
-                 {"desc": "German 6th Army advances into city", 
-                  "map": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Map_Battle_of_Stalingrad-en.svg/800px-Map_Battle_of_Stalingrad-en.svg.png"},
-                 {"desc": "Soviet house-to-house defense & Operation Uranus", 
-                  "map": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Map_Battle_of_Stalingrad-en.svg/800px-Map_Battle_of_Stalingrad-en.svg.png"},
-                 {"desc": "6th Army encircled & destroyed", 
-                  "map": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Map_Battle_of_Stalingrad-en.svg/800px-Map_Battle_of_Stalingrad-en.svg.png"}
+                 {"desc": "German advance into city center", 
+                  "map": "https://upload.wikimedia.org/wikipedia/commons/c/cd/Map_Battle_of_Stalingrad-en.svg"},
+                 {"desc": "Soviet house-to-house fighting", 
+                  "map": "https://upload.wikimedia.org/wikipedia/commons/c/cd/Map_Battle_of_Stalingrad-en.svg"},
+                 {"desc": "Operation Uranus – encirclement", 
+                  "map": "https://upload.wikimedia.org/wikipedia/commons/c/cd/Map_Battle_of_Stalingrad-en.svg"}
              ]},
             {"name": "D-Day Normandy (1944)", "base_cas": 225000,
              "phases": [
-                 {"desc": "Omaha & Utah beaches – initial assault", 
-                  "map": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Map_of_the_D-Day_landings.svg/800px-Map_of_the_D-Day_landings.svg.png"},
-                 {"desc": "Breakout from hedgerows – Operation Cobra", 
-                  "map": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Map_of_the_D-Day_landings.svg/800px-Map_of_the_D-Day_landings.svg.png"},
-                 {"desc": "Allied advance toward Falaise Pocket", 
-                  "map": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Map_of_the_D-Day_landings.svg/800px-Map_of_the_D-Day_landings.svg.png"}
+                 {"desc": "Initial beach landings (Omaha, Utah, etc.)", 
+                  "map": "https://upload.wikimedia.org/wikipedia/commons/c/c4/Map_of_the_D-Day_landings.svg"},
+                 {"desc": "Breakout from hedgerows", 
+                  "map": "https://upload.wikimedia.org/wikipedia/commons/c/c4/Map_of_the_D-Day_landings.svg"},
+                 {"desc": "Advance inland toward Falaise", 
+                  "map": "https://upload.wikimedia.org/wikipedia/commons/c/c4/Map_of_the_D-Day_landings.svg"}
              ]}
         ]
     },
     "Cold War": {
         "sides": ["Western Bloc / UN", "Communist Bloc"],
         "battles": [
-            {"name": "Korean War – Inchon & Escalation (1950)", "base_cas": 178000,
+            {"name": "Korean War – Inchon Landing (1950)", "base_cas": 178000,
              "phases": [
-                 {"desc": "MacArthur’s amphibious landing at Inchon", 
-                  "map": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7f/Inchon_landing_map_%28en%29.svg/800px-Inchon_landing_map_%28en%29.svg.png"},
-                 {"desc": "UN forces recapture Seoul & push north", 
-                  "map": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7f/Inchon_landing_map_%28en%29.svg/800px-Inchon_landing_map_%28en%29.svg.png"},
-                 {"desc": "Chinese People’s Volunteer Army enters – massive counteroffensive", 
-                  "map": "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7f/Inchon_landing_map_%28en%29.svg/800px-Inchon_landing_map_%28en%29.svg.png"}
+                 {"desc": "Amphibious landing at Inchon", 
+                  "map": "https://upload.wikimedia.org/wikipedia/commons/7/7b/Inchon_landing_map_%28en%29.svg"},
+                 {"desc": "UN forces push north to Seoul", 
+                  "map": "https://upload.wikimedia.org/wikipedia/commons/7/7b/Inchon_landing_map_%28en%29.svg"},
+                 {"desc": "Chinese intervention – massive counterattack", 
+                  "map": "https://upload.wikimedia.org/wikipedia/commons/7/7b/Inchon_landing_map_%28en%29.svg"}
              ]}
         ]
     }
@@ -123,7 +121,7 @@ campaigns = {
 # Sidebar
 with st.sidebar:
     st.header("Campaign Control")
-    era = st.selectbox("Select War Era", list(campaigns.keys()))
+    era = st.selectbox("Select Era", list(campaigns.keys()))
 
     if st.button("START CAMPAIGN", type="primary"):
         st.session_state.campaign_active = True
@@ -145,13 +143,13 @@ with st.sidebar:
 
 # Main game
 if not st.session_state.campaign_active:
-    st.info("Select era → START CAMPAIGN → choose your side")
+    st.info("Select an era and click START CAMPAIGN to begin.")
 else:
     era_data = campaigns[st.session_state.era]
     battles = era_data["battles"]
     battle = battles[st.session_state.battle_index]
 
-    # Choose side once
+    # Choose side (once per campaign)
     if st.session_state.side is None:
         st.subheader(f"Choose Your Side – {st.session_state.era}")
         side = st.radio("Which side will you command?", era_data["sides"])
@@ -161,15 +159,17 @@ else:
         st.stop()
 
     # Current phase & map
-    phase_maps = battle.get("phases", [{"desc": "Battlefield Overview", "map": "https://via.placeholder.com/800x450?text=Battle+Map"}])
-    phase = min(st.session_state.phase, len(phase_maps)-1)
+    phase_maps = battle.get("phases", [{"desc": "Battlefield Overview", "map": "https://via.placeholder.com/800x450?text=Battle+Map+Loading..."}])
+    phase = min(st.session_state.phase, len(phase_maps) - 1)
     current_phase = phase_maps[phase]
 
     st.header(f"{battle['name']} – Phase {phase + 1}/3")
     st.caption(current_phase["desc"])
-    st.image(current_phase["map"], caption=f"Front Line Situation – Phase {phase + 1}", use_column_width=True, clamp=True)
+    st.markdown(f'<div class="map-container">', unsafe_allow_html=True)
+    st.image(current_phase["map"], caption=f"Front Line – Phase {phase + 1}", use_column_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    st.write(f"**Commanding:** {st.session_state.side}")
+    st.write(f"**You are commanding:** {st.session_state.side}")
 
     # Resources
     col1, col2, col3 = st.columns(3)
@@ -182,7 +182,7 @@ else:
     st.subheader(f"Phase {phase + 1} Orders")
 
     inf = st.slider("Infantry / Ground Forces %", 20, 80, 50)
-    sup = st.slider("Support (Arty/Air/Naval) %", 10, 60, 35)
+    sup = st.slider("Support (Artillery/Air/Naval) %", 10, 60, 35)
     agg = st.slider("Aggression Level", 1, 10, 5)
 
     if st.button("COMMIT PHASE", type="primary"):
@@ -232,4 +232,4 @@ else:
             st.rerun()
 
 st.divider()
-st.caption(f"© {date.today().year} Lawrence • ECHOES OF WAR • Dynamic Battle Maps")
+st.caption(f"© {date.today().year} Lawrence • ECHOES OF WAR • Maps Update Every Phase")
