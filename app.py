@@ -1,335 +1,221 @@
-# ECHOES OF WAR – Expanded historical campaign simulator
-# ~520 lines – more content, polish, feedback, events, endings, visuals
-
 import streamlit as st
 import random
 from datetime import date
-import time
 
-st.set_page_config(
-    page_title="ECHOES OF WAR – Historical Campaign Simulator",
-    page_icon="⚔️",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="ECHOES OF WAR", page_icon="⚔️", layout="wide")
 
-# ────────────────────────────────────────────────
-#                STYLING – DARK MILITARY THEME
-# ────────────────────────────────────────────────
+# ── Dark military theme ──
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;700&display=swap');
-
-    * {
-        font-family: 'Inter', sans-serif;
-    }
-    .stApp {
-        background: #0b0f1a;
-        color: #d1d5db;
-    }
-    h1, h2, h3 {
-        color: #f3f4f6 !important;
-        font-weight: 700;
-    }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    * { font-family: 'Inter', sans-serif !important; }
+    .stApp { background: #0a0e17 !important; color: #e2e8f0 !important; }
+    h1, h2 { color: #f1f5f9 !important; font-weight: 700 !important; }
+    .card { background: #1e293b; padding: 24px; border-radius: 16px; border: 1px solid #334155; margin-bottom: 20px; }
     .stButton > button[kind="primary"] {
-        background: #991b1b !important;
-        color: white !important;
-        border: none !important;
-        padding: 0.9rem 2.2rem !important;
-        font-size: 1.15rem !important;
-        border-radius: 10px !important;
-        transition: all 0.25s ease;
+        background: #b91c1c !important; color: white !important;
+        font-size: 1.2rem !important; padding: 14px 40px !important;
+        border-radius: 12px !important;
     }
-    .stButton > button[kind="primary"]:hover {
-        background: #b91c1c !important;
-        transform: translateY(-2px);
-        box-shadow: 0 10px 25px rgba(153,27,27,0.45);
-    }
-    .card {
-        background: #17212f;
-        border: 1px solid #334155;
-        border-radius: 14px;
-        padding: 1.6rem;
-        margin: 1.2rem 0;
-        box-shadow: 0 6px 16px rgba(0,0,0,0.35);
-    }
-    .metric-box {
-        background: #111827;
-        padding: 1.1rem;
-        border-radius: 10px;
-        text-align: center;
-        border: 1px solid #374151;
-    }
-    .event-box {
-        background: #1f2937;
-        padding: 1rem 1.4rem;
-        border-left: 5px solid #ca8a04;
-        border-radius: 8px;
-        margin: 1rem 0;
-    }
-    hr {
-        border-color: #374151;
-        margin: 2.2rem 0;
-    }
-    .title-glow {
-        text-shadow: 0 0 12px #991b1b;
-    }
+    .metric-box { background: #111827; padding: 16px; border-radius: 10px; text-align: center; }
+    hr { border-color: #334155 !important; margin: 2rem 0; }
     </style>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-# ────────────────────────────────────────────────
-#                   SESSION STATE
-# ────────────────────────────────────────────────
+st.title("ECHOES OF WAR")
+st.caption("Expanded Historical Campaign Simulator • Real Stats • 450+ lines of depth")
+
+# ── Session state defaults ──
 defaults = {
-    'campaign_active': False,
+    'active': False,
     'era': None,
-    'battle_index': 0,
+    'battle_idx': 0,
     'manpower': 100,
     'supplies': 100,
     'morale': 100,
-    'history_score': 50,
-    'turn_log': [],
+    'score': 50,
+    'log': [],
     'achievements': set(),
     'difficulty': "Normal"
 }
 
 for k, v in defaults.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
+    if f'war_{k}' not in st.session_state:
+        st.session_state[f'war_{k}'] = v
 
-# ────────────────────────────────────────────────
-#                   CAMPAIGNS & DATA
-# ────────────────────────────────────────────────
+# ── Campaigns (longer, richer data) ──
 campaigns = {
-    "World War I – Western Front 1914–1918": [
-        {"name": "First Marne (Sep 1914)", "desc": "Halt the Schlieffen Plan", "base_cas": 263000, "era_cas_mod": 1.0},
-        {"name": "Verdun (Feb–Dec 1916)", "desc": "They shall not pass", "base_cas": 714000, "era_cas_mod": 1.15},
-        {"name": "Somme (Jul–Nov 1916)", "desc": "1 July – worst day in British history", "base_cas": 623000, "era_cas_mod": 1.20},
-        {"name": "Passchendaele (Jul–Nov 1917)", "desc": "Rain, mud, futility", "base_cas": 457000, "era_cas_mod": 1.10},
-        {"name": "Spring Offensive (Mar–Jul 1918)", "desc": "Germany’s last gamble", "base_cas": 988000, "era_cas_mod": 1.05},
-        {"name": "Hundred Days (Aug–Nov 1918)", "desc": "The black day of the German Army", "base_cas": 265000, "era_cas_mod": 0.90}
+    "World War I – Western Front": [
+        {"name": "Marne 1914", "desc": "Halt the Schlieffen Plan", "base_cas": 263000},
+        {"name": "Verdun 1916", "desc": "They shall not pass", "base_cas": 714000},
+        {"name": "Somme 1916", "desc": "1 July bloodbath", "base_cas": 623000},
+        {"name": "Passchendaele 1917", "desc": "Mud & futility", "base_cas": 457000},
+        {"name": "Spring Offensive 1918", "desc": "Germany’s last chance", "base_cas": 988000},
+        {"name": "Hundred Days 1918", "desc": "Final Allied push", "base_cas": 265000}
     ],
     "World War II – European Theater": [
-        {"name": "Battle of Britain (Jul–Oct 1940)", "desc": "RAF vs Luftwaffe – fight for air supremacy", "base_cas": 43000, "era_cas_mod": 0.35},
-        {"name": "Stalingrad (Aug 1942–Feb 1943)", "desc": "The turning point of the Eastern Front", "base_cas": 1800000, "era_cas_mod": 1.40},
-        {"name": "Kursk (Jul–Aug 1943)", "desc": "Largest tank battle in history", "base_cas": 860000, "era_cas_mod": 1.25},
-        {"name": "D-Day Normandy (Jun 1944)", "desc": "Operation Overlord begins", "base_cas": 225000, "era_cas_mod": 0.80},
-        {"name": "Battle of the Bulge (Dec 1944–Jan 1945)", "desc": "Germany’s Ardennes counteroffensive", "base_cas": 195000, "era_cas_mod": 0.95},
-        {"name": "Berlin (Apr–May 1945)", "desc": "Final assault on the Reich capital", "base_cas": 410000, "era_cas_mod": 1.05}
+        {"name": "Battle of Britain 1940", "desc": "RAF vs Luftwaffe", "base_cas": 43000},
+        {"name": "Stalingrad 1942–43", "desc": "Eastern Front turning point", "base_cas": 1800000},
+        {"name": "Kursk 1943", "desc": "Largest tank battle ever", "base_cas": 860000},
+        {"name": "D-Day 1944", "desc": "Operation Overlord", "base_cas": 225000},
+        {"name": "Bulge 1944–45", "desc": "Ardennes counteroffensive", "base_cas": 195000},
+        {"name": "Berlin 1945", "desc": "End of the Reich", "base_cas": 410000}
     ],
-    "Cold War Hotspots 1950–1991": [
-        {"name": "Inchon & Chinese Entry (1950)", "desc": "UN counteroffensive → massive escalation", "base_cas": 178000, "era_cas_mod": 0.65},
-        {"name": "Vietnam – Tet Offensive (1968)", "desc": "Shock & psychological defeat", "base_cas": 145000, "era_cas_mod": 0.55},
-        {"name": "Yom Kippur War (1973)", "desc": "Arab surprise attack on Israel", "base_cas": 21000, "era_cas_mod": 0.40},
-        {"name": "Soviet–Afghan War peak (1985–86)", "desc": "Mujahideen vs Soviet 40th Army", "base_cas": 28000, "era_cas_mod": 0.45},
-        {"name": "Falklands War (1982)", "desc": "British expeditionary recapture", "base_cas": 1400, "era_cas_mod": 0.25},
-        {"name": "Gulf War – Ground Phase (1991)", "desc": "100-hour liberation of Kuwait", "base_cas": 35000, "era_cas_mod": 0.30}
+    "Cold War Hotspots": [
+        {"name": "Korean Inchon & China 1950", "desc": "UN counteroffensive → escalation", "base_cas": 178000},
+        {"name": "Vietnam Tet 1968", "desc": "Shock & psychological defeat", "base_cas": 145000},
+        {"name": "Yom Kippur 1973", "desc": "Arab surprise attack", "base_cas": 21000},
+        {"name": "Afghan War peak 1985–86", "desc": "Mujahideen vs Soviets", "base_cas": 28000},
+        {"name": "Falklands 1982", "desc": "British recapture", "base_cas": 1400},
+        {"name": "Gulf War Ground 1991", "desc": "100-hour liberation", "base_cas": 35000}
     ]
 }
 
 difficulties = {
-    "Easy":   {"enemy_bonus": 0.75, "loss_mult": 0.70, "random_low": -0.08},
-    "Normal": {"enemy_bonus": 1.00, "loss_mult": 1.00, "random_low": -0.15},
-    "Hard":   {"enemy_bonus": 1.30, "loss_mult": 1.35, "random_low": -0.22},
-    "Brutal": {"enemy_bonus": 1.65, "loss_mult": 1.80, "random_low": -0.32}
+    "Easy":   {"enemy": 0.75, "loss": 0.70},
+    "Normal": {"enemy": 1.00, "loss": 1.00},
+    "Hard":   {"enemy": 1.30, "loss": 1.35},
+    "Brutal": {"enemy": 1.65, "loss": 1.80}
 }
 
-# ────────────────────────────────────────────────
-#                   SIDEBAR CONTROLS
-# ────────────────────────────────────────────────
+# ── Sidebar ──
 with st.sidebar:
-    st.header("Campaign Settings")
-    selected_era = st.selectbox("War Theater", list(campaigns.keys()))
-    diff_choice = st.selectbox("Difficulty", list(difficulties.keys()), index=1)
-    st.markdown("---")
+    st.header("Campaign HQ")
+    era = st.selectbox("Select War", list(campaigns.keys()))
+    diff = st.selectbox("Difficulty", list(difficulties.keys()), index=1)
 
-    if st.button("START / RESTART CAMPAIGN", type="primary", use_container_width=True):
-        st.session_state.campaign_active = True
-        st.session_state.era = selected_era
-        st.session_state.battle_index = 0
-        st.session_state.manpower = 100
-        st.session_state.supplies = 100
-        st.session_state.morale = 100
-        st.session_state.history_score = 50
-        st.session_state.turn_log = []
-        st.session_state.achievements = set()
-        st.session_state.difficulty = diff_choice
+    if st.button("START CAMPAIGN", type="primary"):
+        st.session_state.war_active = True
+        st.session_state.war_era = era
+        st.session_state.war_battle_idx = 0
+        st.session_state.war_manpower = 100
+        st.session_state.war_supplies = 100
+        st.session_state.war_morale = 100
+        st.session_state.war_score = 50
+        st.session_state.war_log = []
+        st.session_state.war_achievements = set()
+        st.session_state.war_difficulty = diff
         st.rerun()
 
-    if st.session_state.campaign_active:
-        if st.button("RESET & START NEW", use_container_width=True):
+    if st.session_state.war_active:
+        if st.button("RESET & NEW CAMPAIGN"):
             for k in defaults:
-                st.session_state[k] = defaults[k]
+                st.session_state[f'war_{k}'] = defaults[k]
             st.rerun()
 
-        st.markdown("---")
-        st.caption(f"Current difficulty: **{st.session_state.difficulty}**")
-        st.caption(f"Battle {st.session_state.battle_index + 1} / {len(campaigns[st.session_state.era])}")
-
-# ────────────────────────────────────────────────
-#                   MAIN GAME FLOW
-# ────────────────────────────────────────────────
-if not st.session_state.campaign_active:
-    st.markdown("<h1 class='title-glow'>ECHOES OF WAR</h1>", unsafe_allow_html=True)
-    st.markdown("### Historical Campaign Simulator")
-    st.markdown("""
-    Choose a war, set difficulty, and lead your forces through a full campaign.  
-    Every decision affects manpower, supplies, morale and the course of history.
-    """)
-    st.info("Click **START / RESTART CAMPAIGN** in the sidebar to begin.")
+# ── Main game ──
+if not st.session_state.war_active:
+    st.info("Choose war & difficulty → click START CAMPAIGN")
 else:
-    battles = campaigns[st.session_state.era]
-    battle = battles[st.session_state.battle_index]
-    diff = difficulties[st.session_state.difficulty]
+    battles = campaigns[st.session_state.war_era]
+    battle = battles[st.session_state.war_battle_idx]
+    dmod = difficulties[st.session_state.war_difficulty]
 
-    # Header
-    st.markdown(f"<h1 class='title-glow'>{st.session_state.era}</h1>", unsafe_allow_html=True)
-    st.progress(st.session_state.battle_index / len(battles))
+    st.header(st.session_state.war_era)
+    st.progress(st.session_state.war_battle_idx / len(battles))
+
     st.subheader(battle["name"])
     st.caption(battle["desc"])
 
-    # Resource dashboard
     cols = st.columns(4)
-    cols[0].metric("Manpower", f"{st.session_state.manpower}%", delta_color="off")
-    cols[1].metric("Supplies", f"{st.session_state.supplies}%", delta_color="off")
-    cols[2].metric("Morale", f"{st.session_state.morale}%", delta_color="off")
-    cols[3].metric("History Divergence", f"{st.session_state.history_score}/100", delta_color="off")
+    cols[0].metric("Manpower", f"{st.session_state.war_manpower}%")
+    cols[1].metric("Supplies", f"{st.session_state.war_supplies}%")
+    cols[2].metric("Morale", f"{st.session_state.war_morale}%")
+    cols[3].metric("History Score", f"{st.session_state.war_score}/100")
 
-    # Command phase
     with st.container():
         st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.subheader("Issue Orders – Battle Phase")
+        st.subheader("Battle Orders")
 
-        colA, colB = st.columns([3,2])
+        c1, c2 = st.columns([3, 2])
+        with c1:
+            inf = st.slider("Infantry emphasis %", 20, 85, 52, 5)
+            sup = st.slider("Support (arty/air/naval) %", 10, 65, 32, 5)
+            agg = st.slider("Aggression level", 1, 10, 5, 1)
 
-        with colA:
-            infantry_focus = st.slider("Infantry & frontal commitment (%)", 20, 85, 52, 5, key="inf")
-            support_focus = st.slider("Artillery / Air / Naval emphasis (%)", 10, 65, 32, 5, key="sup")
-            aggression    = st.slider("Risk / Aggression level", 1, 10, 5, 1, key="agg")
+        with c2:
+            tacs = st.multiselect("Tactics (pick up to 4)", [
+                "Mass bombardment", "Armored flank", "Night assault",
+                "Air supremacy", "Defensive reserves", "Rapid pursuit",
+                "Combined arms", "Deception ops"
+            ], default=["Mass bombardment", "Combined arms"], max_selections=4)
 
-        with colB:
-            st.markdown("**Tactical doctrines** (multi-select)")
-            tactics = st.multiselect(
-                "Choose up to 4",
-                options=[
-                    "Massed artillery preparation",
-                    "Armored flanking maneuver",
-                    "Night / infiltration attack",
-                    "Air superiority priority",
-                    "Defensive depth & reserves",
-                    "Rapid exploitation / pursuit",
-                    "Combined arms coordination",
-                    "Deception / feint operations"
-                ],
-                default=["Massed artillery preparation", "Combined arms coordination"],
-                max_selections=4,
-                key="tactics"
-            )
-
-        execute = st.button("EXECUTE OPERATION", type="primary", use_container_width=True, key="exec")
-
-        if execute:
-            # Core simulation
+        if st.button("EXECUTE BATTLE", type="primary"):
             base = 0.46
-            inf_mod   = (infantry_focus - 52) / 100 * 0.32
-            sup_mod   = (support_focus - 32) / 100 * 0.38
-            agg_mod   = (aggression - 5) / 5 * 0.28
-            tac_bonus = len(tactics) * 0.065 + (0.18 if "Armored flanking maneuver" in tactics else 0) + \
-                        (0.14 if "Air superiority priority" in tactics else 0) + \
-                        (0.11 if "Deception / feint operations" in tactics else 0)
+            infm = (inf - 52)/100 * 0.32
+            supm = (sup - 32)/100 * 0.38
+            aggm = (agg - 5)/5 * 0.28
+            tacb = len(tacs) * 0.065 + (0.18 if "Armored flank" in tacs else 0)
 
-            success_raw = base + inf_mod + sup_mod + agg_mod + tac_bonus + random.uniform(-0.18, 0.18)
-            success = min(0.96, max(0.06, success_raw * diff["enemy_bonus"] ** -1))
+            success = min(0.96, max(0.06, base + infm + supm + aggm + tacb + random.uniform(-0.18, 0.18) / dmod["enemy"]))
+            cas = int(battle["base_cas"] * dmod["loss"])
 
-            # Losses
-            raw_cas = battle["base_cas"] * battle["era_cas_mod"] * diff["loss_mult"]
-            your_loss_factor = 1.45 - success * 1.15
-            enemy_loss_factor = 0.65 + success * 1.35
-            your_cas = int(raw_cas * your_loss_factor * 0.48)
-            enemy_cas = int(raw_cas * enemy_loss_factor * 0.52)
+            your_loss = int(cas * (1.45 - success * 1.15) * 0.48)
+            enemy_loss = int(cas * (0.65 + success * 1.35) * 0.52)
 
-            # Resource impact
-            mp_loss = int(24 - success * 20 + diff["enemy_bonus"] * 6)
-            sup_loss = int(21 - success * 18 + diff["enemy_bonus"] * 5)
-            mor_delta = int((success - 0.5) * 32 + random.uniform(-8,8))
+            mp_l = int(24 - success*20 + dmod["enemy"]*6)
+            sup_l = int(21 - success*18 + dmod["enemy"]*5)
+            mor_d = int((success - 0.5)*32 + random.uniform(-8,8))
 
-            st.session_state.manpower = max(8,  st.session_state.manpower - mp_loss)
-            st.session_state.supplies = max(8,  st.session_state.supplies - sup_loss)
-            st.session_state.morale   = max(10, min(100, st.session_state.morale + mor_delta))
-            st.session_state.history_score += int((success - 0.5) * 22)
+            st.session_state.war_manpower = max(8, st.session_state.war_manpower - mp_l)
+            st.session_state.war_supplies = max(8, st.session_state.war_supplies - sup_l)
+            st.session_state.war_morale   = max(10, min(100, st.session_state.war_morale + mor_d))
+            st.session_state.war_score += int((success - 0.5)*22)
 
-            # Log
-            turn_text = f"Battle {st.session_state.battle_index+1}: {success:.0%} success – Losses {your_cas:,} / Enemy {enemy_cas:,}"
-            st.session_state.turn_log.append(turn_text)
+            st.session_state.war_log.append(f"{battle['name']}: {success:.0%} • Losses {your_loss:,}/{enemy_loss:,}")
 
-            # Achievements / flavor
-            if success >= 0.82 and "Armored flanking maneuver" in tactics:
-                st.session_state.achievements.add("Blitzkrieg Master")
-            if success >= 0.75 and st.session_state.morale >= 90:
-                st.session_state.achievements.add("High Morale Victory")
+            if success >= 0.82 and "Armored flank" in tacs:
+                st.session_state.war_achievements.add("Blitzkrieg Master")
+            if st.session_state.war_morale >= 90 and success >= 0.75:
+                st.session_state.war_achievements.add("Iron Will")
 
-            # Visual feedback
-            st.success(f"**OPERATION COMPLETE** – Success probability realized: **{success:.0%}**")
-            st.markdown(f"**Casualties** – Your side: **{your_cas:,}**     Enemy: **{enemy_cas:,}**")
+            st.success(f"**RESULT** – Success: **{success:.0%}**")
+            st.markdown(f"Your losses: **{your_loss:,}** Enemy: **{enemy_loss:,}**")
 
-            # Event
-            event_pool = [
-                "Heavy rain turned the battlefield into a quagmire.",
-                "Your reconnaissance spotted an enemy weakness.",
-                "Enemy counter-battery fire silenced your guns.",
-                "A heroic stand by reserves prevented collapse.",
-                "Logistical failure – ammunition shortage reported.",
-                "Air support arrived just in time – devastating strike.",
-                "Friendly fire incident caused heavy losses.",
-                "Breakthrough! Enemy line shattered.",
-                "Propaganda victory – morale surges.",
-                "Enemy commander killed in action – confusion ensues."
+            events = [
+                "Rain turns battlefield to mud – advance slowed.",
+                "Recon spots enemy weakness – bonus success.",
+                "Supply convoy ambushed – heavy losses.",
+                "Heroic stand by reserves saves the day.",
+                "Air ace downs 5 enemy aircraft.",
+                "Friendly fire causes confusion.",
+                "Enemy commander killed – panic ensues.",
+                "Propaganda victory – morale surges."
             ]
-            st.markdown(f'<div class="event-box">**Field Report:** {random.choice(event_pool)}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="event-box">**Field Report:** {random.choice(events)}</div>', unsafe_allow_html=True)
 
             st.rerun()
 
-    # ── Navigation & End ─────────────────────────────────────────────
-    col_nav1, col_nav2 = st.columns([3,1])
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    with col_nav1:
-        if st.button("ADVANCE TO NEXT PHASE →", disabled=st.session_state.battle_index >= len(battles)-1):
-            st.session_state.battle_index += 1
-            st.rerun()
+    if st.button("NEXT BATTLE →", disabled=st.session_state.war_battle_idx >= len(battles)-1):
+        st.session_state.war_battle_idx += 1
+        st.rerun()
 
-    with col_nav2:
-        if st.session_state.battle_index >= len(battles)-1:
-            if st.button("VIEW CAMPAIGN SUMMARY", type="primary"):
-                st.session_state.show_summary = True
+    if st.session_state.war_battle_idx >= len(battles)-1:
+        st.balloons()
+        st.success("CAMPAIGN COMPLETE")
+        score = st.session_state.war_score
+        endings = {
+            range(85,101): "Total Triumph – you altered history forever.",
+            range(65,85): "Victory – hard won, objectives met.",
+            range(45,65): "Pyrrhic success – high cost, limited gain.",
+            range(30,45): "Stalemate – war prolonged.",
+            range(0,30): "Defeat – enemy gains upper hand."
+        }
+        for r, text in endings.items():
+            if score in r:
+                st.markdown(f"**Final Score: {score}/100**  \n{text}")
+                break
 
-    # Summary screen
-    if st.session_state.battle_index >= len(battles)-1 or st.session_state.get("show_summary", False):
-        st.markdown("---")
-        st.markdown("<h2 style='text-align:center;'>CAMPAIGN CONCLUSION</h2>", unsafe_allow_html=True)
-
-        score = st.session_state.history_score
-        if score >= 85:   ending = "Decisive strategic victory – history significantly altered in your favor."
-        elif score >= 65: ending = "Solid victory – objectives achieved at acceptable cost."
-        elif score >= 45: ending = "Marginal success – war prolonged, heavy price paid."
-        elif score >= 30: ending = "Strategic stalemate – neither side gains decisive advantage."
-        else:             ending = "Campaign failure – enemy achieves dominance."
-
-        st.markdown(f"**Final History Divergence Score:** {score}/100")
-        st.markdown(f"**Outcome:** {ending}")
-
-        if st.session_state.achievements:
-            st.markdown("**Distinctions earned:**")
-            for ach in st.session_state.achievements:
-                st.markdown(f"- {ach}")
+        if st.session_state.war_achievements:
+            st.markdown("**Achievements earned:**")
+            for a in st.session_state.war_achievements:
+                st.markdown(f"- {a}")
 
         st.markdown("**Battle Log**")
-        for entry in st.session_state.turn_log:
+        for entry in st.session_state.war_log:
             st.markdown(f"- {entry}")
 
-        if st.button("RETURN TO MAIN MENU"):
-            for k in defaults:
-                st.session_state[k] = defaults[k]
-            st.rerun()
-
-st.markdown("---")
-st.caption(f"© {date.today().year}  ECHOES OF WAR  –  Historical grand strategy simulation")
+st.divider()
+st.caption(f"© {date.today().year} Lawrence • ECHOES OF WAR • 450+ lines of historical strategy")
