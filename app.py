@@ -23,7 +23,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("ECHOES OF WAR")
-st.caption("Fully Turn-Based • 8 Diverse Actions • Dynamic Soldier Maps • Weather & Newspapers")
+st.caption("Turn-Based • 5 Actions • Weather on Map • Hidden Enemy Health • Scout Weak Points")
 
 # Session state
 if 'campaign_active' not in st.session_state:
@@ -34,7 +34,7 @@ if 'side' not in st.session_state:
     st.session_state.side = None
 if 'battle_index' not in st.session_state:
     st.session_state.battle_index = 0
-if 'manpower' not in st.session_state:
+if 'manpower' not in st.session_state:      # Player Health
     st.session_state.manpower = 100
 if 'supplies' not in st.session_state:
     st.session_state.supplies = 100
@@ -46,6 +46,10 @@ if 'front_line' not in st.session_state:
     st.session_state.front_line = 0.5
 if 'weather' not in st.session_state:
     st.session_state.weather = "Clear"
+if 'enemy_health' not in st.session_state:   # Hidden until critical scout
+    st.session_state.enemy_health = 100
+if 'weak_points_discovered' not in st.session_state:
+    st.session_state.weak_points_discovered = False
 if 'log' not in st.session_state:
     st.session_state.log = []
 
@@ -57,24 +61,47 @@ campaigns = {
 
 weathers = ["Clear", "Rain", "Mud", "Snow", "Fog"]
 
-def generate_map(front_line, manpower):
+def generate_map(front_line, manpower, weather, enemy_health_visible):
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.set_facecolor('#0a0e17')
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 0.5)
     ax.axis('off')
+
+    # Base terrain
     ax.add_patch(plt.Rectangle((0,0), 1, 0.5, color='#4a7043', alpha=0.7))
+
+    # Weather visuals
+    if weather == "Rain":
+        for _ in range(80):
+            x = random.uniform(0,1)
+            ax.plot([x, x+0.02], [random.uniform(0,0.5), random.uniform(0.3,0.5)], color='#88ccff', alpha=0.6, linewidth=1)
+    elif weather == "Snow":
+        for _ in range(60):
+            ax.scatter(random.uniform(0,1), random.uniform(0,0.5), color='white', s=8, alpha=0.8)
+    elif weather == "Mud":
+        ax.add_patch(plt.Rectangle((0,0), 1, 0.5, color='#3d2b1f', alpha=0.6))
+    elif weather == "Fog":
+        ax.add_patch(plt.Rectangle((0,0), 1, 0.5, color='white', alpha=0.25))
+
+    # Front line
     x = np.linspace(0, 1, 100)
     y = 0.25 + 0.05 * np.sin(x * 12)
     ax.plot(x, y, color='white', linewidth=5)
-    ax.fill_between(x, y, 0, color='#1e40af' if st.session_state.side == "Allies" else '#991b1b', alpha=0.6)
 
     # Your soldiers (blue)
-    for i in range(max(4, int(manpower/8))):
+    num_your = max(4, int(manpower/8))
+    for i in range(num_your):
         ax.scatter(front_line - 0.15 + (i%5)*0.06, 0.18 + random.uniform(-0.05,0.05), color='#1e90ff', marker='^', s=220, edgecolor='white')
+
     # Enemy soldiers (red)
-    for i in range(max(4, int((200-manpower)/8))):
+    num_enemy = max(4, int((200 - manpower)/8))
+    for i in range(num_enemy):
         ax.scatter(front_line + 0.15 - (i%5)*0.06, 0.32 + random.uniform(-0.05,0.05), color='#ff3333', marker='v', s=220, edgecolor='white')
+
+    # Enemy health bar (only if revealed)
+    if enemy_health_visible:
+        ax.add_patch(plt.Rectangle((0.75, 0.42), st.session_state.enemy_health/100*0.2, 0.04, color='#ff3333'))
 
     buf = io.BytesIO()
     fig.savefig(buf, format='png', bbox_inches='tight', facecolor='#0a0e17')
@@ -98,6 +125,8 @@ with st.sidebar:
         st.session_state.history_score = 50
         st.session_state.front_line = 0.5
         st.session_state.weather = random.choice(weathers)
+        st.session_state.enemy_health = 100
+        st.session_state.weak_points_discovered = False
         st.session_state.log = []
         st.rerun()
 
@@ -121,15 +150,19 @@ else:
 
     st.header(f"{battle['name']} – Turn {st.session_state.battle_index + 1}")
     st.caption(f"Weather: **{st.session_state.weather}**")
-    map_buf = generate_map(st.session_state.front_line, st.session_state.manpower)
+
+    map_buf = generate_map(st.session_state.front_line, st.session_state.manpower, st.session_state.weather, st.session_state.enemy_health < 100)
     st.image(map_buf, caption="Live Battlefield with Soldiers", use_column_width=True)
 
     st.write(f"**You command:** {st.session_state.side}")
 
     col1, col2, col3 = st.columns(3)
-    col1.metric("Manpower", f"{st.session_state.manpower}%")
+    col1.metric("Your Health", f"{st.session_state.manpower}%")
     col2.metric("Supplies", f"{st.session_state.supplies}%")
     col3.metric("Morale", f"{st.session_state.morale}%")
+
+    if st.session_state.enemy_health < 100:
+        st.metric("Enemy Health (Revealed!)", f"{int(st.session_state.enemy_health)}%")
 
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("Choose Your Action This Turn")
@@ -138,62 +171,60 @@ else:
 
     with colA:
         if st.button("🔍 Scout Ahead"):
-            success = random.uniform(0.7, 0.95)
-            st.session_state.history_score += 8
-            st.session_state.morale += 5
-            st.session_state.front_line += 0.05
-            st.info("Scouts report enemy weak spots!")
+            if random.random() < 0.001:  # 1/1000 critical success
+                st.session_state.enemy_health = random.randint(40, 90)
+                st.success("CRITICAL SCOUT! Enemy health revealed!")
+            elif random.random() < 0.65:
+                st.session_state.weak_points_discovered = True
+                st.success("Weak points discovered! Next attack deals 50% more damage!")
+            else:
+                st.info("Scouts found nothing useful.")
+
         if st.button("⚔️ Direct Assault"):
-            success = random.uniform(0.4, 0.85)
-            st.session_state.manpower -= 12
-            st.session_state.front_line += 0.12
-            st.info("Brave charge – heavy fighting!")
+            dmg = 18 if st.session_state.weak_points_discovered else 12
+            st.session_state.enemy_health -= dmg
+            st.session_state.manpower -= 10
+            st.session_state.weak_points_discovered = False
+            st.info("Direct assault launched!")
+
         if st.button("🔄 Flanking Maneuver"):
-            success = random.uniform(0.6, 0.9)
-            st.session_state.front_line += 0.15
-            st.info("Flank successful!")
-        if st.button("💥 Artillery Bombardment"):
-            success = random.uniform(0.65, 0.85)
-            st.session_state.supplies -= 10
-            st.info("Artillery rains down!")
+            dmg = 15 if st.session_state.weak_points_discovered else 10
+            st.session_state.enemy_health -= dmg
+            st.session_state.front_line += 0.12
+            st.session_state.weak_points_discovered = False
+            st.info("Flanking maneuver executed!")
 
     with colB:
+        if st.button("💥 Artillery Bombardment"):
+            dmg = 14 if st.session_state.weak_points_discovered else 9
+            st.session_state.enemy_health -= dmg
+            st.session_state.supplies -= 12
+            st.session_state.weak_points_discovered = False
+            st.info("Artillery barrage fired!")
+
         if st.button("🛡️ Defensive Entrenchment"):
-            st.session_state.morale += 15
-            st.session_state.manpower -= 5
-            st.info("Troops dig in – morale rises.")
-        if st.button("🏃 Rapid Advance"):
-            success = random.uniform(0.5, 0.8)
-            st.session_state.front_line += 0.18
-            st.session_state.supplies -= 8
-            st.info("We push forward!")
-        if st.button("✈️ Air Support Strike"):
-            success = random.uniform(0.75, 0.95)
-            st.session_state.supplies -= 15
-            st.info("Air support devastates enemy!")
-        if st.button("📢 Propaganda Campaign"):
-            st.session_state.morale += 20
-            st.session_state.history_score += 10
-            st.info("Morale boosted across the front!")
+            st.session_state.morale += 18
+            st.session_state.manpower -= 6
+            st.info("Troops entrenched – morale rising.")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Newspaper
-    if st.session_state.phase > 0:  # dummy phase for headline trigger
+    if len(st.session_state.log) > 0:
         headline = random.choice([
             f"HEROIC {st.session_state.side.upper()} ADVANCE!",
             f"ENEMY LINES SHATTERED!",
             f"HEAVY FIGHTING AT {battle['name']}",
             f"OUR TROOPS STAND FIRM!"
         ])
-        st.markdown(f'<div class="newspaper"><div class="headline">{headline}</div><p>Our brave forces under {st.session_state.side} command continue the fight for freedom.</p></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="newspaper"><div class="headline">{headline}</div><p>Latest dispatch from the front.</p></div>', unsafe_allow_html=True)
 
-    if st.session_state.get("show_end", False):
+    if st.session_state.enemy_health <= 0 or st.session_state.manpower <= 0:
         st.balloons()
-        st.success("CAMPAIGN COMPLETE")
+        st.success("CAMPAIGN COMPLETE" if st.session_state.enemy_health <= 0 else "DEFEAT")
         if st.button("RETURN TO MENU"):
             st.session_state.campaign_active = False
             st.rerun()
 
 st.divider()
-st.caption(f"© {date.today().year} Lawrence • ECHOES OF WAR • 8 Turn Actions • Live Soldier Maps")
+st.caption(f"© {date.today().year} Lawrence • ECHOES OF WAR • Weather on Map • 5 Turn Actions • Hidden Enemy Health")
