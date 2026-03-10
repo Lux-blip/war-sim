@@ -15,6 +15,8 @@ st.markdown("""
     .stApp { background: #0a0e17 !important; color: #e2e8f0 !important; }
     h1, h2 { color: #f1f5f9 !important; font-weight: 700 !important; }
     .card { background: #1e293b; padding: 24px; border-radius: 16px; border: 1px solid #334155; margin-bottom: 20px; }
+    .newspaper { background: #f5e8c7; color: #1a1a1a; padding: 1.5rem; border: 4px solid #333; font-family: serif; margin: 1rem 0; }
+    .headline { font-size: 1.5rem; font-weight: 700; color: #b91c1c; text-align: center; margin-bottom: 0.5rem; }
     .stButton > button[kind="primary"] {
         background: #b91c1c !important; color: white !important;
         font-size: 1.2rem !important; padding: 14px 40px !important;
@@ -24,7 +26,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 st.title("ECHOES OF WAR")
-st.caption("Dynamic Maps with Soldiers • Choose Your Side • Turn-Based")
+st.caption("Dynamic Maps with Soldiers • Weather • Newspaper Headlines • Choose Your Side")
 
 # Session state
 if 'campaign_active' not in st.session_state:
@@ -47,6 +49,8 @@ if 'history_score' not in st.session_state:
     st.session_state.history_score = 50
 if 'front_line' not in st.session_state:
     st.session_state.front_line = 0.5
+if 'weather' not in st.session_state:
+    st.session_state.weather = "Clear"
 
 # Campaigns
 campaigns = {
@@ -55,15 +59,16 @@ campaigns = {
     "Cold War": {"sides": ["Western Bloc", "Communist Bloc"], "battles": [{"name": "Inchon 1950", "base_cas": 178000}]}
 }
 
-# Generate map with soldiers
-def generate_battle_map(front_line=0.5, phase=0, your_manpower=100):
+weathers = ["Clear", "Rain", "Mud", "Snow", "Fog"]
+
+def generate_map(front_line, phase, manpower, weather):
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.set_facecolor('#0a0e17')
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 0.5)
     ax.axis('off')
 
-    # Terrain background
+    # Terrain
     ax.add_patch(plt.Rectangle((0,0), 1, 0.5, color='#4a7043', alpha=0.7))
 
     # Front line
@@ -72,22 +77,17 @@ def generate_battle_map(front_line=0.5, phase=0, your_manpower=100):
     ax.plot(x, y, color='white', linewidth=5)
 
     # Your soldiers (blue)
-    num_your = max(3, int(your_manpower / 10))
+    num_your = max(4, int(manpower / 8))
     for i in range(num_your):
-        x_pos = front_line - 0.15 + (i % 5) * 0.06
-        y_pos = 0.15 + random.uniform(-0.05, 0.05)
-        ax.scatter(x_pos, y_pos, color='#1e90ff', marker='^', s=180, edgecolor='white')
+        ax.scatter(front_line - 0.12 + (i%6)*0.04, 0.18 + random.uniform(-0.04,0.04), color='#1e90ff', marker='^', s=220, edgecolor='white')
 
     # Enemy soldiers (red)
-    num_enemy = max(3, int((200 - your_manpower) / 10))
+    num_enemy = max(4, int((200 - manpower) / 8))
     for i in range(num_enemy):
-        x_pos = front_line + 0.15 - (i % 5) * 0.06
-        y_pos = 0.35 + random.uniform(-0.05, 0.05)
-        ax.scatter(x_pos, y_pos, color='#ff3333', marker='v', s=180, edgecolor='white')
+        ax.scatter(front_line + 0.12 - (i%6)*0.04, 0.32 + random.uniform(-0.04,0.04), color='#ff3333', marker='v', s=220, edgecolor='white')
 
-    # Legend
-    ax.text(0.05, 0.45, "YOUR FORCES", color='#1e90ff', fontsize=12, weight='bold')
-    ax.text(0.75, 0.45, "ENEMY FORCES", color='#ff3333', fontsize=12, weight='bold')
+    ax.text(0.05, 0.45, f"YOUR FORCES ({st.session_state.side})", color='#1e90ff', fontsize=11, weight='bold')
+    ax.text(0.75, 0.45, "ENEMY FORCES", color='#ff3333', fontsize=11, weight='bold')
 
     buf = io.BytesIO()
     fig.savefig(buf, format='png', bbox_inches='tight', facecolor='#0a0e17')
@@ -111,6 +111,7 @@ with st.sidebar:
         st.session_state.morale = 100
         st.session_state.history_score = 50
         st.session_state.front_line = 0.5
+        st.session_state.weather = random.choice(weathers)
         st.rerun()
 
     if st.session_state.campaign_active and st.button("RESET"):
@@ -119,7 +120,7 @@ with st.sidebar:
 
 # Game
 if not st.session_state.campaign_active:
-    st.info("Select era and click START")
+    st.info("Select era → START → choose side")
 else:
     battles = campaigns[st.session_state.era]["battles"]
     battle = battles[st.session_state.battle_index]
@@ -132,11 +133,13 @@ else:
             st.rerun()
         st.stop()
 
+    # Current map
     st.header(f"{battle['name']} – Phase {st.session_state.phase + 1}/3")
-    map_buf = generate_battle_map(st.session_state.front_line, st.session_state.phase, st.session_state.manpower)
-    st.image(map_buf, caption="Live Battlefield Map with Soldiers", use_column_width=True)
+    st.caption(f"Weather: **{st.session_state.weather}**")
+    map_buf = generate_map(st.session_state.front_line, st.session_state.phase, st.session_state.manpower, st.session_state.weather)
+    st.image(map_buf, caption="Live Battlefield with Soldiers", use_column_width=True)
 
-    st.write(f"**You command:** {st.session_state.side}")
+    st.write(f"**Commanding:** {st.session_state.side}")
 
     col1, col2, col3 = st.columns(3)
     col1.metric("Manpower", f"{st.session_state.manpower}%")
@@ -144,14 +147,16 @@ else:
     col3.metric("Morale", f"{st.session_state.morale}%")
 
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.subheader("Phase Orders")
+    st.subheader(f"Phase {st.session_state.phase + 1} Orders")
 
     inf = st.slider("Infantry %", 20, 80, 50)
     sup = st.slider("Support %", 10, 60, 35)
     agg = st.slider("Aggression", 1, 10, 5)
 
     if st.button("COMMIT PHASE", type="primary"):
-        success = min(0.95, max(0.08, 0.48 + (inf/50*0.3) + (sup/35*0.35) + (agg/5*0.25) + random.uniform(-0.15, 0.15)))
+        # Weather effect
+        weather_mod = {"Clear": 0, "Rain": -0.08, "Mud": -0.15, "Snow": -0.12, "Fog": -0.10}[st.session_state.weather]
+        success = min(0.95, max(0.08, 0.48 + (inf/50*0.3) + (sup/35*0.35) + (agg/5*0.25) + random.uniform(-0.15, 0.15) + weather_mod))
 
         mp_loss = int(12 - success * 9)
         sup_loss = int(10 - success * 8)
@@ -165,11 +170,25 @@ else:
         st.session_state.front_line += (success - 0.5) * 0.18
         st.session_state.front_line = max(0.1, min(0.9, st.session_state.front_line))
 
+        # Newspaper headline
+        if success > 0.75:
+            headline = f"GLORIOUS ADVANCE! {st.session_state.side.upper()} SMASHES ENEMY LINES"
+        elif success > 0.5:
+            headline = f"HEROIC STAND – {st.session_state.side.upper()} HOLDS THE LINE"
+        else:
+            headline = f"HEAVY LOSSES – {st.session_state.side.upper()} FORCED TO RETREAT"
+
+        st.markdown(f'<div class="newspaper"><div class="headline">{headline}</div>'
+                    f'<p>Phase {st.session_state.phase+1} of {battle["name"]}. Casualties heavy but spirit unbroken. '
+                    f'Our brave troops under {st.session_state.side} command continue the fight for freedom.</p></div>', 
+                    unsafe_allow_html=True)
+
         st.session_state.phase += 1
         if st.session_state.phase >= 3:
             st.session_state.phase = 0
             if st.session_state.battle_index < len(battles) - 1:
                 st.session_state.battle_index += 1
+                st.session_state.weather = random.choice(weathers)
                 st.session_state.front_line = 0.5
             else:
                 st.session_state.show_end = True
@@ -180,9 +199,15 @@ else:
     if st.session_state.get("show_end", False):
         st.balloons()
         st.success("CAMPAIGN COMPLETE")
+        score = st.session_state.history_score
+        if score > 85: st.write("**Legendary Victory** – You changed history!")
+        elif score > 60: st.write("**Victory** – Hard fought and won.")
+        elif score > 40: st.write("**Stalemate**")
+        else: st.write("**Defeat**")
+
         if st.button("RETURN TO MENU"):
             st.session_state.campaign_active = False
             st.rerun()
 
 st.divider()
-st.caption(f"© {date.today().year} Lawrence • Soldiers move on the map every phase")
+st.caption(f"© {date.today().year} Lawrence • ECHOES OF WAR • Weather + Newspapers + Live Soldier Maps")
